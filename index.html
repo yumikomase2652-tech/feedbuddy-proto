@@ -4117,6 +4117,56 @@
       /* 末尾の空白は他の全画面ページ（設定・おきもの等）の
          スクロール領域と同じ88pxに統一する（上の80px指定を置き換え） */
       .bl-info { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+
+      /* ============ ホーム画面（スタンドアロン）表示のセーフエリア追随 ============
+         GitHub Pages に置いて iPhone のホーム画面から全画面（standalone）
+         で開くと、ブラウザ表示と違い、ステータスバー（時刻・電波・電池、
+         ノッチ／Dynamic Island）とホームインジケータの領域まで WebView が
+         広がる。その前提が抜けていた箇所があり、実機では
+         (1) フィード上部のサブタブ／検索ボタンがステータスバーに被って見えない
+         (2) 下タブバーのカプセルが画面下端から浮きすぎる
+         (3) 画面の一番下に body の地色（グレー）の帯が出る
+         という3症状になっていた。ここでまとめて直す。
+         env(safe-area-inset-*) は Muse カード／通常ブラウザ表示では 0 に
+         なるので、そちらの従来表示は変わらない。 */
+
+      /* (3) アプリ本体を画面の上下いっぱいに届かせる：
+         100dvh に加えて html→body→.app の height:100% チェーンでも受け、
+         standalone で dvh が実画面より短く返る端末でも本体が下端まで
+         届くようにする。あわせて standalone では body の地色をアプリの
+         地色に寄せ、万一すき間が出てもグレーの帯として見えないように
+         する（広い画面でのフレーム外の地色は従来どおり） */
+      @media (display-mode: standalone) {
+        html, body { height: 100%; }
+        body { background: #F7FAFA; }
+        .app { height: 100%; }
+      }
+      @media (display-mode: standalone) and (prefers-color-scheme: dark) {
+        body { background: #131A1D; }
+      }
+
+      /* (1) フィード上部：ヘッダーごとステータスバーの下へ下げる。
+         サブタブはヘッダーの padding-top で、検索ボタンは top の補正で
+         それぞれ inset ぶん下がる。スライド側のステージ／フック／
+         タップフィードバックも同じだけ下げ、タブと中身が重ならない
+         ようにする（セッションバーは元から inset 対応済み） */
+      #screen-feed .feed-header { padding-top: env(safe-area-inset-top); }
+      #screen-feed .feed-search-btn { top: calc(3px + env(safe-area-inset-top)); }
+      #screen-feed .stage { top: calc(46px + env(safe-area-inset-top)); }
+      #screen-feed .hook { top: calc(46px + env(safe-area-inset-top)); }
+      #screen-feed .tap-flash { top: calc(46px + env(safe-area-inset-top)); }
+      /* マイページ上部のボタン列と各一覧ページのヘッダーも、上端に
+         inset ぶんの余白が無く同症状になるので同じだけ下げる */
+      .mypage-head { padding-top: calc(16px + env(safe-area-inset-top)); }
+      .page-head { padding-top: calc(14px + env(safe-area-inset-top)); }
+
+      /* (2) 下タブバー：カプセルの下端をホームインジケータの標準位置
+         （セーフエリア＋6px）に置く。本体が下端まで届くようになった
+         分と合わせて、カプセルは画面下部に落ち着く。
+         各画面がカプセル占有ゾーンとして確保している下余白
+         （64px＋inset）は、カプセル上端（6＋54＝60px＋inset）より
+         大きいままなので、中身がカプセルに隠れることはない */
+      .tabbar { bottom: calc(6px + env(safe-area-inset-bottom)); }
     </style>
   </head>
   <body>
