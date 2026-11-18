@@ -45,7 +45,26 @@
             (window.navigator && window.navigator.standalone === true) ||
             (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
         } catch (e) { standalone = false; }
-        if (standalone) document.documentElement.classList.add('is-standalone');
+        if (standalone) {
+          document.documentElement.classList.add('is-standalone');
+          /* タブバーの下端固定（bottom:0）は末尾 CSS の2系統
+             （@media (display-mode: standalone)／html.is-standalone 配下）
+             でも行っているが、ホーム画面 WebView ではスタイル適用が
+             不安定で既定の calc(10px + env(safe-area-inset-bottom)) に
+             戻ってしまうことがあるため、DOM 構築後にインラインでも
+             bottom:0 を直接指定して三重化する。カプセルの下端が画面の
+             物理的な最下端に付くのは viewport-fit=cover（上の meta）が
+             前提で、レイアウト領域がセーフエリアの外まで広がって初めて
+             bottom:0 が物理端と一致する。standalone 時のみ実行し、
+             カード／通常ブラウザ表示では何もしない */
+          var pinTabbar = function () {
+            var bar = document.querySelector('.tabbar');
+            if (bar) bar.style.bottom = '0px';
+          };
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', pinTabbar);
+          } else { pinTabbar(); }
+        }
       })();
     </script>
     <style>
