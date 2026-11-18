@@ -61,9 +61,65 @@
             var bar = document.querySelector('.tabbar');
             if (bar) bar.style.bottom = '0px';
           };
+          /* 枠の高さの実画面同期：ホーム画面 WebView ではレイアウト
+             ビューポートの高さが実際に見えている画面とずれることが
+             あり、.app の下端が見えている画面の下端に届かず、枠の
+             外側の地色が下端に帯として残り、カプセルもその帯の分
+             だけ上に留まって見えた。visualViewport.height（実際に
+             見えている高さ）を .app の高さへ直接同期し、枠の下端＝
+             見えている画面の下端に一致させて帯そのものを消す。
+             タブバーは bottom:0 のままなので、カプセルは枠の下端
+             （＝画面の下端）まで下がる。リサイズ／回転／
+             visualViewport の変化にも追随させる。あわせて html／
+             body の地色をアプリ背景の実色に寄せ、万一すき間が
+             残っても色違いの帯として見えないようにする（保険）。
+             入力中（キーボード表示中）は visualViewport が縮むが、
+             その間は同期を止め、閉じた後に追随し直す */
+          var syncAppHeight = function () {
+            var ae = document.activeElement;
+            if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+            var app = document.querySelector('.app');
+            if (!app) return;
+            var h = 0;
+            try {
+              h = (window.visualViewport && window.visualViewport.height) ||
+                  window.innerHeight || 0;
+            } catch (e) { h = 0; }
+            if (h > 0) app.style.height = Math.round(h) + 'px';
+            try {
+              var bg = window.getComputedStyle(app).backgroundColor;
+              if (bg) {
+                document.documentElement.style.backgroundColor = bg;
+                if (document.body) document.body.style.backgroundColor = bg;
+              }
+            } catch (e) {}
+          };
+          var initStandalone = function () {
+            pinTabbar();
+            syncAppHeight();
+            /* アプリ内ダーク切替で背景色が変わったら地色も追随させる */
+            var app = document.querySelector('.app');
+            if (app && window.MutationObserver) {
+              new MutationObserver(syncAppHeight).observe(app, {
+                attributes: true, attributeFilter: ['class']
+              });
+            }
+          };
           if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', pinTabbar);
-          } else { pinTabbar(); }
+            document.addEventListener('DOMContentLoaded', initStandalone);
+          } else { initStandalone(); }
+          window.addEventListener('resize', syncAppHeight);
+          window.addEventListener('orientationchange', syncAppHeight);
+          if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', syncAppHeight);
+          }
+          document.addEventListener('focusout', function () {
+            setTimeout(syncAppHeight, 60);
+          });
+          /* 起動直後はビューポートの高さが安定していないことが
+             あるため、少し遅らせて再同期する */
+          setTimeout(syncAppHeight, 250);
+          setTimeout(syncAppHeight, 1000);
         }
       })();
     </script>
@@ -412,7 +468,7 @@
       .item-dock {
         position: absolute; left: 0; right: 0;
         width: 100%;
-        bottom: 74px;
+        bottom: calc(74px + env(safe-area-inset-bottom));
         display: flex; flex-direction: column; align-items: center;
         padding: 4px 0 2px;
         background: linear-gradient(to top, color-mix(in srgb, var(--bg) 88%, transparent) 58%, transparent);
@@ -579,7 +635,7 @@
          （既定のタブバー帯 下から64px の上に 10px＝74px）でアイテム
          ドックと揃える。standalone では末尾のスタンドアロン節で 64px に詰める */
       .cam-dock {
-        position: absolute; left: 0; right: 0; width: 100%; bottom: 74px; z-index: 30;
+        position: absolute; left: 0; right: 0; width: 100%; bottom: calc(74px + env(safe-area-inset-bottom)); z-index: 30;
         display: flex; flex-direction: column; align-items: center; gap: 10px;
         pointer-events: none;
       }
@@ -4036,7 +4092,7 @@
       /* 下の余白は浮いたタブバーカプセル（既定は下から64px）の
          ぶん＋24px：最後の結果までカプセルに隠れずスクロールできる。
          standalone では末尾のスタンドアロン節で 78px に詰める */
-      .search-body { flex: 1 1 auto; overflow-y: auto; padding: 6px 20px 88px; scrollbar-width: none; overscroll-behavior: contain; }
+      .search-body { flex: 1 1 auto; overflow-y: auto; padding: 6px 20px calc(88px + env(safe-area-inset-bottom)); scrollbar-width: none; overscroll-behavior: contain; }
       .search-body::-webkit-scrollbar { display: none; }
       .search-item {
         display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
@@ -4080,6 +4136,11 @@
          カプセルの占有ゾーンより上に、中身の見える位置を保つ。
          ※ここに書くのは既定（カード／通常ブラウザ表示）の寸法で、
          カプセル上端は下端10px＋高さ54＝下から64px が基準。
+         ただし既定のカプセル位置は calc(10px + env(safe-area-inset-bottom))
+         なので、inset が効く表示環境ではカプセル上端が inset ぶん
+         高くなる。各ゾーンはその浮きに追随させるため、すべて
+         calc(従来値 + env(safe-area-inset-bottom)) で表す
+         （inset=0 の環境では従来どおりの見え方になる）。
          standalone ではカプセルが下端0px（上端54px）まで下がるぶん、
          各ゾーンを10px詰めた値を末尾のスタンドアロン節
          （@media (display-mode: standalone) と html.is-standalone
@@ -4089,31 +4150,31 @@
          キャンバス（ステージ）が画面下端まで伸びたぶん 3D 画角の
          中心が下がり、バディが下にズレて体がカードに隠れた。
          フィードと同じ方式で、画面の下パディングでステージを
-         カプセルゾーン（既定は下から68px）ぶん縮め、画角と足元の
+         カプセルゾーン（既定は下から68px＋セーフエリア下inset）ぶん縮め、画角と足元の
          位置をカプセル化前とまったく同じに戻す。カードはステージ内の
          従来位置（bottom:22px）のままで、アプリ下端からの見える
-         位置はカプセル上端基準で今までどおり（68＋22＝90px）。
+         位置はカプセル上端基準で今までどおり（68＋inset＋22＝90px＋inset）。
          ステージの下の帯には #screen-buddy 自身の地色が流れる。
          地色はステージと共有する --buddy-bg（既定は var(--bg)、
          ログボの背景色を適用するとその色に差し替わる）なので、
          帯〜画面一番下・浮いたタブバーカプセルの裏まで同じ色が
          切れ目なく続き、境目は出ない。ステージの大きさ・3Dの
          構図はこの帯のぶん縮めたまま一切変えない */
-      #screen-buddy { padding-bottom: 68px; background: var(--buddy-bg, var(--bg)); }
+      #screen-buddy { padding-bottom: calc(68px + env(safe-area-inset-bottom)); background: var(--buddy-bg, var(--bg)); }
       .buddy-card { bottom: 22px; }
       /* フィード：スライドの描画エリア（.feed）は従来の高さのままにし、
          ラップ側の下パディングの地色だけがカプセルの後ろへ流れる。
          ラップ内のシート類も従来の見える位置（アプリ下端から）を保つ */
-      #screen-feed .feed-wrap { padding-bottom: 68px; }
-      #screen-feed .feed-wrap .sheet { bottom: 78px; }
-      #screen-feed .feed-wrap #commentSheet { bottom: 68px; }
+      #screen-feed .feed-wrap { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
+      #screen-feed .feed-wrap .sheet { bottom: calc(78px + env(safe-area-inset-bottom)); }
+      #screen-feed .feed-wrap #commentSheet { bottom: calc(68px + env(safe-area-inset-bottom)); }
       /* マイページ配下：スクロール最下部の中身がカプセルに隠れない
          よう、各ビューの下余白をカプセルゾーン＋24pxに広げる */
-      #screen-mypage .mypage-main { padding-bottom: 88px; }
+      #screen-mypage .mypage-main { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
       #screen-mypage .collection-view,
-      #screen-mypage .book-list-view { padding-bottom: 88px; }
-      #screen-mypage .follow-view .fv-body { padding-bottom: 88px; }
-      #screen-mypage .book-detail .bd-cta { margin-bottom: 88px; }
+      #screen-mypage .book-list-view { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+      #screen-mypage .follow-view .fv-body { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+      #screen-mypage .book-detail .bd-cta { margin-bottom: calc(88px + env(safe-area-inset-bottom)); }
       /* 全画面ページは検索画面と同じ扱いに統一：どのページを開いても
          浮いたタブバーカプセルを表示したままにする。各ページの
          z-index はタブバー（58）より下に付け替えた（設定50／
@@ -4123,11 +4184,11 @@
          あわせて、各ページの下端の中身がカプセルに隠れないよう
          スクロール／フッターの下余白をカプセルゾーン＋αに広げる
          （検索画面の .search-body 88px と同じ考え方） */
-      .settings-body { padding-bottom: 92px; }
-      .streak-body { padding-bottom: 92px; }
-      .photo-foot { padding-bottom: 84px; }
-      .share-foot { padding-bottom: 84px; }
-      .bl-info { padding-bottom: 84px; }
+      .settings-body { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+      .streak-body { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+      .photo-foot { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+      .share-foot { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+      .bl-info { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
       /* おきもの／チャンネルはこの統一から漏れていて、末尾の項目が
          カプセルの後ろに隠れたままスクロールしきれなかった（元の
          下余白24pxのまま）。他ページと同じくカプセル上端64px＋
@@ -4135,8 +4196,8 @@
          スクロールして見えるようにする。背景自体は従来どおり
          画面下端（カプセルの後ろ）まで伸ばしたままにし、足すのは
          スクロール領域末尾の空白だけ */
-      .props-body { padding-bottom: 92px; }
-      .ch-body { padding-bottom: 92px; }
+      .props-body { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+      .ch-body { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
 
       /* ============ バディ一覧：ポップアップをやめて全画面ページに（最終確定） ============
          浮いたカード（四隅角丸＋周囲の余白＋グラバー＋ガラスの透け）は
@@ -4175,7 +4236,7 @@
       .bl-title { line-height: 1.3; }
       /* 末尾の空白は他の全画面ページ（設定・おきもの等）の
          スクロール領域と同じ92pxに統一する（上の84px指定を置き換え） */
-      .bl-info { padding-bottom: 92px; }
+      .bl-info { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
 
       /* ============ ホーム画面（スタンドアロン）表示のセーフエリア追随 ============
          GitHub Pages に置いて iPhone のホーム画面から全画面（standalone）
@@ -4200,7 +4261,11 @@
 
       @media (display-mode: standalone) {
         html, body { height: 100%; }
+        html { background: #F7FAFA; }
         body { background: #F7FAFA; }
+        /* アプリ内ダーク切替（.app.dark）時も地色をアプリ背景に一致させる */
+        html:has(.app.dark) { background: #131A1D; }
+        body:has(.app.dark) { background: #131A1D; }
 
         /* (3) アプリ本体を画面の上下いっぱいに届かせる：
            standalone では .app をビューポートへ fixed＋inset:0 で固定し、
@@ -4274,7 +4339,10 @@
          がマッチしなかった実機症状（タブバーの下にホームバーぶんの
          隙間が残る）への対策で、こちらが本命 */
       html.is-standalone, html.is-standalone body { height: 100%; }
+      html.is-standalone { background: #F7FAFA; }
       html.is-standalone body { background: #F7FAFA; }
+      html.is-standalone:has(.app.dark) { background: #131A1D; }
+      html.is-standalone:has(.app.dark) body { background: #131A1D; }
       html.is-standalone .app { position: fixed; inset: 0; margin-inline: auto; height: auto; }
       html.is-standalone #screen-feed .feed-header { padding-top: max(0px, calc(env(safe-area-inset-top) - 8px)); }
       html.is-standalone #screen-feed .feed-search-btn { top: calc(3px + max(0px, calc(env(safe-area-inset-top) - 8px))); }
@@ -4309,7 +4377,7 @@
       }
 
       @media (display-mode: standalone) and (prefers-color-scheme: dark) {
-        body { background: #131A1D; }
+        html, body { background: #131A1D; }
       }
     </style>
   </head>
