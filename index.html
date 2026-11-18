@@ -29,6 +29,25 @@
          Base64で埋め込んであり（下の __GLB_B64__）、読み込み側は
          fetch せず GLTFLoader.parse で直接パースする。index.html
          単体を置いただけの環境でもバディが表示されるようにするため -->
+    <!-- スタンドアロン判定：iOS のホーム画面 WebView では
+         @media (display-mode: standalone) がマッチしないことがあるため、
+         CSS のメディア指定だけに頼らず、JS でも判定して html に
+         is-standalone クラスを付ける。スタンドアロン向け CSS は
+         末尾の @media 節と html.is-standalone 配下の両方に同じ内容で置く。
+         カード／通常ブラウザ表示では付かない（navigator.standalone は
+         iOS のホーム画面アプリでのみ true、matchMedia も
+         display-mode: standalone のときだけ true になる） -->
+    <script>
+      (function () {
+        var standalone = false;
+        try {
+          standalone =
+            (window.navigator && window.navigator.standalone === true) ||
+            (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+        } catch (e) { standalone = false; }
+        if (standalone) document.documentElement.classList.add('is-standalone');
+      })();
+    </script>
     <style>
       button, [role="button"], select, summary, input:not([type="checkbox"], [type="radio"], [type="range"]) { min-height: 2rem; }
       /* range（シークバー）は対象外：min-heightが効くと入力欄の箱全体が
@@ -369,8 +388,8 @@
          既定（カード／通常ブラウザ表示）のタブバー帯は 下端10px＋
          高さ54px＝下から 64px。その上に 10px 空けて 74px に置く
          （ドットがドックの最下部なので、ドットがタブバーのすぐ上に
-         来る）。standalone ではタブバーが下端4pxまで下がるぶん、
-         末尾の @media で 68px に詰める */
+         来る）。standalone ではタブバーが下端0pxまで下がるぶん、
+         末尾のスタンドアロン節で 64px に詰める */
       .item-dock {
         position: absolute; left: 0; right: 0;
         width: 100%;
@@ -539,7 +558,7 @@
       /* シャッター（と×）もアイテムブロックと同じ扱い：.app 直下の
          .cam-ui 内に absolute で置き、下端はタブバーのすぐ上
          （既定のタブバー帯 下から64px の上に 10px＝74px）でアイテム
-         ドックと揃える。standalone では末尾の @media で 68px に詰める */
+         ドックと揃える。standalone では末尾のスタンドアロン節で 64px に詰める */
       .cam-dock {
         position: absolute; left: 0; right: 0; width: 100%; bottom: 74px; z-index: 30;
         display: flex; flex-direction: column; align-items: center; gap: 10px;
@@ -3997,7 +4016,7 @@
       .search-count { margin: 12px 2px 2px; font-size: 11.5px; font-weight: 700; color: var(--ink-3); font-variant-numeric: tabular-nums; }
       /* 下の余白は浮いたタブバーカプセル（既定は下から64px）の
          ぶん＋24px：最後の結果までカプセルに隠れずスクロールできる。
-         standalone では末尾の @media で 82px に詰める */
+         standalone では末尾のスタンドアロン節で 78px に詰める */
       .search-body { flex: 1 1 auto; overflow-y: auto; padding: 6px 20px 88px; scrollbar-width: none; overscroll-behavior: contain; }
       .search-body::-webkit-scrollbar { display: none; }
       .search-item {
@@ -4042,9 +4061,10 @@
          カプセルの占有ゾーンより上に、中身の見える位置を保つ。
          ※ここに書くのは既定（カード／通常ブラウザ表示）の寸法で、
          カプセル上端は下端10px＋高さ54＝下から64px が基準。
-         standalone ではカプセルが下端4px（上端58px）まで下がるぶん、
-         各ゾーンを6px詰めた値を末尾の @media (display-mode:
-         standalone) で上書きする（カード表示には影響させない） */
+         standalone ではカプセルが下端0px（上端54px）まで下がるぶん、
+         各ゾーンを10px詰めた値を末尾のスタンドアロン節
+         （@media (display-mode: standalone) と html.is-standalone
+         配下）で上書きする（カード表示には影響させない） */
       /* バディ画面：ステージ自体をカプセル化前の高さに戻す。
          以前はカードだけを 86px に持ち上げて辻褄を合わせていたが、
          キャンバス（ステージ）が画面下端まで伸びたぶん 3D 画角の
@@ -4147,13 +4167,17 @@
          (2) 下タブバーのカプセルが画面下端から浮きすぎる
          (3) 画面の一番下に body の地色（グレー）の帯が出る
          という3症状になっていた。ここでまとめて直す。
-         ★重要：この節の調整はすべて @media (display-mode: standalone)
-         の中だけに閉じ込める。プロトタイプは普段 Muse のカード画面上で
-         触るもので、standalone 向けの寸法（.app の fixed 化、タブバーの
-         bottom:4px、右上カプセルの詰め、ヘッダーの safe-area 追随、
-         カプセル帯に合わせた下余白の詰め）を既定に混ぜると、カード表示の
-         比率が変わって触れない・ずれる。カード／通常ブラウザ表示は
-         この節が一切効かず、調整前の元のレイアウト・比率のままになる */
+         ★重要：この節の調整はすべてスタンドアロン表示の中だけに
+         閉じ込める。効かせ方は2系統併用する：@media (display-mode:
+         standalone) と、JS 判定で html に付けた is-standalone クラス
+         配下（iOS のホーム画面 WebView では @media がマッチしない
+         ことがあるため、メディア指定だけに頼らない）。プロトタイプは
+         普段 Muse のカード画面上で触るもので、standalone 向けの寸法
+         （.app の fixed 化、タブバーの bottom:0、右上カプセルの詰め、
+         ヘッダーの safe-area 追随、カプセル帯に合わせた下余白の詰め）を
+         既定に混ぜると、カード表示の比率が変わって触れない・ずれる。
+         カード／通常ブラウザ表示はこの節が一切効かず、調整前の元の
+         レイアウト・比率のままになる */
 
       @media (display-mode: standalone) {
         html, body { height: 100%; }
@@ -4186,37 +4210,37 @@
         .mypage-head { padding-top: calc(16px + env(safe-area-inset-top)); }
         .page-head { padding-top: calc(14px + env(safe-area-inset-top)); }
 
-        /* (2) 下タブバー：カプセルの下端を画面の物理的な下端から約 4px の
-           位置まで下げ、ホームバー（黒い横線）がカプセルの下部に重なる
-           くらい寄せる（LINE のタブバーのような置き方）。セーフエリアは
-           足さない。.app を fixed＋inset:0 でビューポートに固定してある
-           ので、この bottom は常に物理画面の下端基準になる。
-           カプセルの上端は 4＋54＝下から 58px */
-        .tabbar { bottom: 4px; }
+        /* (2) 下タブバー：カプセルの下端を画面の物理的な最下端に付け、
+           ホームバー（黒い横線）がカプセルの下部に重なる置き方にする
+           （LINE のタブバーと同じ）。セーフエリアは足さない。.app を
+           fixed＋inset:0 でビューポートに固定してあるので、この
+           bottom は常に物理画面の下端基準になる。
+           カプセルの上端は 0＋54＝下から 54px */
+        .tabbar { bottom: 0px; }
 
-        /* カプセル帯（上端58px）に合わせた下余白ゾーン：既定（上端64px
-           基準）の値から一律6px詰める。カプセル上端との間隔は既定と
+        /* カプセル帯（上端54px）に合わせた下余白ゾーン：既定（上端64px
+           基準）の値から一律10px詰める。カプセル上端との間隔は既定と
            同じに保たれるので中身は隠れない */
-        #screen-buddy { padding-bottom: 62px; }
-        #screen-feed .feed-wrap { padding-bottom: 62px; }
-        #screen-feed .feed-wrap .sheet { bottom: 72px; }
-        #screen-feed .feed-wrap #commentSheet { bottom: 62px; }
-        #screen-mypage .mypage-main { padding-bottom: 82px; }
+        #screen-buddy { padding-bottom: 58px; }
+        #screen-feed .feed-wrap { padding-bottom: 58px; }
+        #screen-feed .feed-wrap .sheet { bottom: 68px; }
+        #screen-feed .feed-wrap #commentSheet { bottom: 58px; }
+        #screen-mypage .mypage-main { padding-bottom: 78px; }
         #screen-mypage .collection-view,
-        #screen-mypage .book-list-view { padding-bottom: 82px; }
-        #screen-mypage .follow-view .fv-body { padding-bottom: 82px; }
-        #screen-mypage .book-detail .bd-cta { margin-bottom: 82px; }
-        .settings-body { padding-bottom: 86px; }
-        .streak-body { padding-bottom: 86px; }
-        .photo-foot { padding-bottom: 78px; }
-        .share-foot { padding-bottom: 78px; }
-        .bl-info { padding-bottom: 86px; }
-        .props-body { padding-bottom: 86px; }
-        .ch-body { padding-bottom: 86px; }
-        .search-body { padding-bottom: 82px; }
-        /* アイテム／撮影ドックもタブバーのすぐ上（58＋10＝68px）に詰める */
-        .item-dock { bottom: 68px; }
-        .cam-dock { bottom: 68px; }
+        #screen-mypage .book-list-view { padding-bottom: 78px; }
+        #screen-mypage .follow-view .fv-body { padding-bottom: 78px; }
+        #screen-mypage .book-detail .bd-cta { margin-bottom: 78px; }
+        .settings-body { padding-bottom: 82px; }
+        .streak-body { padding-bottom: 82px; }
+        .photo-foot { padding-bottom: 74px; }
+        .share-foot { padding-bottom: 74px; }
+        .bl-info { padding-bottom: 82px; }
+        .props-body { padding-bottom: 82px; }
+        .ch-body { padding-bottom: 82px; }
+        .search-body { padding-bottom: 78px; }
+        /* アイテム／撮影ドックもタブバーのすぐ上（54＋10＝64px）に詰める */
+        .item-dock { bottom: 64px; }
+        .cam-dock { bottom: 64px; }
 
         /* (4) バディ画面の右上カプセル：ステータスバーのすぐ下・画面の
            右端に寄せて置く（LINE の右上ピルの感覚）。上は
@@ -4224,6 +4248,47 @@
            寸法（160×44、アイコンボックス36px・間隔20px）は変えない */
         .buddy-top { padding: calc(8px + env(safe-area-inset-top)) 10px 0; }
       }
+
+      /* 上の @media 節と同じ調整を html.is-standalone 配下でも効かせる
+         （JS 判定フォールバック。値は @media 節と必ず一致させること）。
+         iOS のホーム画面 WebView で @media (display-mode: standalone)
+         がマッチしなかった実機症状（タブバーの下にホームバーぶんの
+         隙間が残る）への対策で、こちらが本命 */
+      html.is-standalone, html.is-standalone body { height: 100%; }
+      html.is-standalone body { background: #F7FAFA; }
+      html.is-standalone .app { position: fixed; inset: 0; margin-inline: auto; height: auto; }
+      html.is-standalone #screen-feed .feed-header { padding-top: max(0px, calc(env(safe-area-inset-top) - 8px)); }
+      html.is-standalone #screen-feed .feed-search-btn { top: calc(3px + max(0px, calc(env(safe-area-inset-top) - 8px))); }
+      html.is-standalone #screen-feed .stage { top: calc(46px + max(0px, calc(env(safe-area-inset-top) - 8px))); }
+      html.is-standalone #screen-feed .hook { top: calc(46px + max(0px, calc(env(safe-area-inset-top) - 8px))); }
+      html.is-standalone #screen-feed .tap-flash { top: calc(46px + max(0px, calc(env(safe-area-inset-top) - 8px))); }
+      html.is-standalone .mypage-head { padding-top: calc(16px + env(safe-area-inset-top)); }
+      html.is-standalone .page-head { padding-top: calc(14px + env(safe-area-inset-top)); }
+      html.is-standalone .tabbar { bottom: 0px; }
+      html.is-standalone #screen-buddy { padding-bottom: 58px; }
+      html.is-standalone #screen-feed .feed-wrap { padding-bottom: 58px; }
+      html.is-standalone #screen-feed .feed-wrap .sheet { bottom: 68px; }
+      html.is-standalone #screen-feed .feed-wrap #commentSheet { bottom: 58px; }
+      html.is-standalone #screen-mypage .mypage-main { padding-bottom: 78px; }
+      html.is-standalone #screen-mypage .collection-view,
+      html.is-standalone #screen-mypage .book-list-view { padding-bottom: 78px; }
+      html.is-standalone #screen-mypage .follow-view .fv-body { padding-bottom: 78px; }
+      html.is-standalone #screen-mypage .book-detail .bd-cta { margin-bottom: 78px; }
+      html.is-standalone .settings-body { padding-bottom: 82px; }
+      html.is-standalone .streak-body { padding-bottom: 82px; }
+      html.is-standalone .photo-foot { padding-bottom: 74px; }
+      html.is-standalone .share-foot { padding-bottom: 74px; }
+      html.is-standalone .bl-info { padding-bottom: 82px; }
+      html.is-standalone .props-body { padding-bottom: 82px; }
+      html.is-standalone .ch-body { padding-bottom: 82px; }
+      html.is-standalone .search-body { padding-bottom: 78px; }
+      html.is-standalone .item-dock { bottom: 64px; }
+      html.is-standalone .cam-dock { bottom: 64px; }
+      html.is-standalone .buddy-top { padding: calc(8px + env(safe-area-inset-top)) 10px 0; }
+      @media (prefers-color-scheme: dark) {
+        html.is-standalone body { background: #131A1D; }
+      }
+
       @media (display-mode: standalone) and (prefers-color-scheme: dark) {
         body { background: #131A1D; }
       }
