@@ -70,9 +70,17 @@
         --gold: #D9A441;
         --silver: #9AA7AD;
         --bronze: #B97F4E;
-        position: relative;
+        /* 枠の底＝画面の物理的な下端に必ず一致させる：height:100dvh だけだと
+           standalone で dvh が実画面より短く返る端末があり、枠が下端まで
+           届かず下タブバーが浮いて見えた。ビューポートへ fixed＋inset:0 で
+           固定し、高さは inset の引き伸ばし（height:auto）に任せる。
+           横は width＋max-width＋margin-inline:auto で従来どおり中央の
+           430px 列を保つ */
+        position: fixed;
+        inset: 0;
+        margin-inline: auto;
         width: 100%; max-width: 430px;
-        height: 100dvh;
+        height: auto;
         background: var(--bg);
         color: var(--ink);
         display: flex; flex-direction: column;
@@ -147,7 +155,10 @@
       .buddy-top {
         position: absolute; top: 0; left: 0; right: 0; z-index: 6;
         display: flex; justify-content: flex-end;
-        padding: calc(12px + env(safe-area-inset-top)) 14px 0;
+        /* 右上カプセルはステータスバーのすぐ下・画面の右端寄せに詰める
+           （LINE の右上ピルの感覚）：上は inset＋8px、右は 10px。
+           カプセル自体の寸法（160×44・箱36px・間隔20px）は変えない */
+        padding: calc(8px + env(safe-area-inset-top)) 10px 0;
         pointer-events: none;
       }
       /* 右上カプセル：背景に合わせるすりガラス。ライト時は白＋濃色線アイコン、ダーク時は暗色＋白線アイコン */
@@ -355,13 +366,13 @@
          バディの位置・画角はホームと完全に同じままになる */
       /* ドックは .app 直下の .item-ui（アプリ画面全体のレイヤー）の中に
          absolute で置き、下端はタブバーのすぐ上に合わせる。
-         タブバー帯は 下端9px＋高さ54px＝下から 63px。その上に
-         10px 空けて 73px に置く（ドットがドックの最下部なので、
+         タブバー帯は 下端4px＋高さ54px＝下から 58px。その上に
+         10px 空けて 68px に置く（ドットがドックの最下部なので、
          ドットがタブバーのすぐ上に来る） */
       .item-dock {
         position: absolute; left: 0; right: 0;
         width: 100%;
-        bottom: 73px;
+        bottom: 68px;
         display: flex; flex-direction: column; align-items: center;
         padding: 4px 0 2px;
         background: linear-gradient(to top, color-mix(in srgb, var(--bg) 88%, transparent) 58%, transparent);
@@ -525,10 +536,10 @@
       .cam-close:active { transform: scale(.92); }
       /* シャッター（と×）もアイテムブロックと同じ扱い：.app 直下の
          .cam-ui 内に absolute で置き、下端はタブバーのすぐ上
-         （タブバー帯 下から63px の上に 10px＝73px）でアイテムドックと
+         （タブバー帯 下から58px の上に 10px＝68px）でアイテムドックと
          揃える。タブバーに接するくらい低い位置にする */
       .cam-dock {
-        position: absolute; left: 0; right: 0; width: 100%; bottom: 73px; z-index: 30;
+        position: absolute; left: 0; right: 0; width: 100%; bottom: 68px; z-index: 30;
         display: flex; flex-direction: column; align-items: center; gap: 10px;
         pointer-events: none;
       }
@@ -1009,7 +1020,10 @@
       #screen-feed .feed-wrap {
           width:100%;
           flex:0 0 auto;
-          height:100dvh;
+          /* 高さは dvh ではなく親（画面）基準の 100% にする：.app を
+             fixed＋inset:0 で物理画面に固定してあるので、dvh が短く
+             返る端末でもフィードの底がアプリ下端まで届く */
+          height:100%;
           position:sticky; top:0;
           background:#fff;
           overflow:hidden;
@@ -3979,9 +3993,9 @@
       }
       .search-chips button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
       .search-count { margin: 12px 2px 2px; font-size: 11.5px; font-weight: 700; color: var(--ink-3); font-variant-numeric: tabular-nums; }
-      /* 下の余白は浮いたタブバーカプセル（下から63px）の
+      /* 下の余白は浮いたタブバーカプセル（下から58px）の
          ぶん＋24px：最後の結果までカプセルに隠れずスクロールできる */
-      .search-body { flex: 1 1 auto; overflow-y: auto; padding: 6px 20px 87px; scrollbar-width: none; overscroll-behavior: contain; }
+      .search-body { flex: 1 1 auto; overflow-y: auto; padding: 6px 20px 82px; scrollbar-width: none; overscroll-behavior: contain; }
       .search-body::-webkit-scrollbar { display: none; }
       .search-item {
         display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
@@ -4022,40 +4036,41 @@
          タブバーが流れの外に出て画面下端に浮いたぶん、各画面は
          フレームいっぱいまで広がる。背景はそのまま下端まで流れる
          ので、調整が要るのは「下端に置かれる中身」の位置だけ：
-         カプセルの占有ゾーン（下端9px＋高さ54＝下から63px）
+         カプセルの占有ゾーン（下端4px＋高さ54＝下から58px）
          より上に、中身の見える位置を保つ。
-         ※ゾーンの各値は「カプセル上端63px＋従来の間隔」で固定値に
-         してある（旧指定の Npx＋セーフエリア → (N+3)px） */
+         ※ゾーンの各値は「カプセル上端58px＋従来の間隔」で固定値に
+         してある（カプセルを 9px→4px に下げたぶん、各ゾーンも
+         5px ずつ詰めてカプセル上端との間隔を従来どおりに保つ） */
       /* バディ画面：ステージ自体をカプセル化前の高さに戻す。
          以前はカードだけを 86px に持ち上げて辻褄を合わせていたが、
          キャンバス（ステージ）が画面下端まで伸びたぶん 3D 画角の
          中心が下がり、バディが下にズレて体がカードに隠れた。
          フィードと同じ方式で、画面の下パディングでステージを
-         カプセルゾーン（下から67px）ぶん縮め、画角と足元の
+         カプセルゾーン（下から62px）ぶん縮め、画角と足元の
          位置をカプセル化前とまったく同じに戻す。カードはステージ内の
          従来位置（bottom:22px）のままで、アプリ下端からの見える
-         位置は今までどおり（67＋22＝89px）。
+         位置はカプセル上端基準で今までどおり（62＋22＝84px）。
          ステージの下の帯には #screen-buddy 自身の地色が流れる。
          地色はステージと共有する --buddy-bg（既定は var(--bg)、
          ログボの背景色を適用するとその色に差し替わる）なので、
          帯〜画面一番下・浮いたタブバーカプセルの裏まで同じ色が
          切れ目なく続き、境目は出ない。ステージの大きさ・3Dの
          構図はこの帯のぶん縮めたまま一切変えない */
-      #screen-buddy { padding-bottom: 67px; background: var(--buddy-bg, var(--bg)); }
+      #screen-buddy { padding-bottom: 62px; background: var(--buddy-bg, var(--bg)); }
       .buddy-card { bottom: 22px; }
       /* フィード：スライドの描画エリア（.feed）は従来の高さのままにし、
          ラップ側の下パディングの地色だけがカプセルの後ろへ流れる。
          ラップ内のシート類も従来の見える位置（アプリ下端から）を保つ */
-      #screen-feed .feed-wrap { padding-bottom: 67px; }
-      #screen-feed .feed-wrap .sheet { bottom: 77px; }
-      #screen-feed .feed-wrap #commentSheet { bottom: 67px; }
+      #screen-feed .feed-wrap { padding-bottom: 62px; }
+      #screen-feed .feed-wrap .sheet { bottom: 72px; }
+      #screen-feed .feed-wrap #commentSheet { bottom: 62px; }
       /* マイページ配下：スクロール最下部の中身がカプセルに隠れない
          よう、各ビューの下余白をカプセルゾーン＋24pxに広げる */
-      #screen-mypage .mypage-main { padding-bottom: 87px; }
+      #screen-mypage .mypage-main { padding-bottom: 82px; }
       #screen-mypage .collection-view,
-      #screen-mypage .book-list-view { padding-bottom: 87px; }
-      #screen-mypage .follow-view .fv-body { padding-bottom: 87px; }
-      #screen-mypage .book-detail .bd-cta { margin-bottom: 87px; }
+      #screen-mypage .book-list-view { padding-bottom: 82px; }
+      #screen-mypage .follow-view .fv-body { padding-bottom: 82px; }
+      #screen-mypage .book-detail .bd-cta { margin-bottom: 82px; }
       /* 全画面ページは検索画面と同じ扱いに統一：どのページを開いても
          浮いたタブバーカプセルを表示したままにする。各ページの
          z-index はタブバー（58）より下に付け替えた（設定50／
@@ -4064,21 +4079,21 @@
          モーダルなので従来どおりカプセルより上に置く。
          あわせて、各ページの下端の中身がカプセルに隠れないよう
          スクロール／フッターの下余白をカプセルゾーン＋αに広げる
-         （検索画面の .search-body 87px と同じ考え方） */
-      .settings-body { padding-bottom: 91px; }
-      .streak-body { padding-bottom: 91px; }
-      .photo-foot { padding-bottom: 83px; }
-      .share-foot { padding-bottom: 83px; }
-      .bl-info { padding-bottom: 83px; }
+         （検索画面の .search-body 82px と同じ考え方） */
+      .settings-body { padding-bottom: 86px; }
+      .streak-body { padding-bottom: 86px; }
+      .photo-foot { padding-bottom: 78px; }
+      .share-foot { padding-bottom: 78px; }
+      .bl-info { padding-bottom: 78px; }
       /* おきもの／チャンネルはこの統一から漏れていて、末尾の項目が
          カプセルの後ろに隠れたままスクロールしきれなかった（元の
-         下余白24pxのまま）。他ページと同じくカプセル上端63px＋
-         28px＝91pxに揃え、最後の項目までカプセルの上へ
+         下余白24pxのまま）。他ページと同じくカプセル上端58px＋
+         28px＝86pxに揃え、最後の項目までカプセルの上へ
          スクロールして見えるようにする。背景自体は従来どおり
          画面下端（カプセルの後ろ）まで伸ばしたままにし、足すのは
          スクロール領域末尾の空白だけ */
-      .props-body { padding-bottom: 91px; }
-      .ch-body { padding-bottom: 91px; }
+      .props-body { padding-bottom: 86px; }
+      .ch-body { padding-bottom: 86px; }
 
       /* ============ バディ一覧：ポップアップをやめて全画面ページに（最終確定） ============
          浮いたカード（四隅角丸＋周囲の余白＋グラバー＋ガラスの透け）は
@@ -4088,7 +4103,7 @@
          z-index はタブバー（58）より下の55のままなので、開いても
          浮いたタブバーカプセルは表示されたままになる。背景は画面下端
          （カプセルの裏）までそのまま流れ、末尾の空白は他のスクロール
-         ページと同じ91pxに揃え、最後の項目（「バディにする」ボタン）
+         ページと同じ86pxに揃え、最後の項目（「バディにする」ボタン）
          までカプセルの上にスクロールして見えるようにする。
          中身（クルクル回るカルーセル、情報パネル、CTA）は従来どおり */
       .buddy-list {
@@ -4116,8 +4131,8 @@
       }
       .bl-title { line-height: 1.3; }
       /* 末尾の空白は他の全画面ページ（設定・おきもの等）の
-         スクロール領域と同じ91pxに統一する（上の83px指定を置き換え） */
-      .bl-info { padding-bottom: 91px; }
+         スクロール領域と同じ86pxに統一する（上の78px指定を置き換え） */
+      .bl-info { padding-bottom: 86px; }
 
       /* ============ ホーム画面（スタンドアロン）表示のセーフエリア追随 ============
          GitHub Pages に置いて iPhone のホーム画面から全画面（standalone）
@@ -4132,15 +4147,17 @@
          なるので、そちらの従来表示は変わらない。 */
 
       /* (3) アプリ本体を画面の上下いっぱいに届かせる：
-         100dvh に加えて html→body→.app の height:100% チェーンでも受け、
-         standalone で dvh が実画面より短く返る端末でも本体が下端まで
-         届くようにする。あわせて standalone では body の地色をアプリの
-         地色に寄せ、万一すき間が出てもグレーの帯として見えないように
-         する（広い画面でのフレーム外の地色は従来どおり） */
+         .app は基本指定で position:fixed; inset:0 にしてあり、枠の底は
+         常にビューポート（＝物理画面）の下端と一致する。standalone で
+         dvh／height が実画面より短く返る端末でも、固定配置の引き伸ばし
+         が優先されるので本体が下端まで届かないことはない。あわせて
+         standalone では body の地色をアプリの地色に寄せ、万一すき間が
+         出てもグレーの帯として見えないようにする（広い画面での
+         フレーム外の地色は従来どおり） */
       @media (display-mode: standalone) {
         html, body { height: 100%; }
         body { background: #F7FAFA; }
-        .app { height: 100%; }
+        .app { position: fixed; inset: 0; height: auto; }
       }
       @media (display-mode: standalone) and (prefers-color-scheme: dark) {
         body { background: #131A1D; }
@@ -4164,14 +4181,21 @@
       .mypage-head { padding-top: calc(16px + env(safe-area-inset-top)); }
       .page-head { padding-top: calc(14px + env(safe-area-inset-top)); }
 
-      /* (2) 下タブバー：カプセルの下端を画面の物理的な下端から 9px の
-         位置まで下げ、ホームインジケータの帯と重なるくらい寄せる
-         （LINE のタブバーのような置き方）。セーフエリアは足さない。
-         カプセルの上端は 9＋54＝下から 63px。各画面の下余白ゾーンは
-         この上端に合わせて固定値へ付け替えてあり（従来の
-         「Npx＋セーフエリア」を「(N+3)px」に）、カプセル上端との
-         間隔は従来どおりに保たれるので中身は隠れない */
-      .tabbar { bottom: 9px; }
+      /* (2) 下タブバー：カプセルの下端を画面の物理的な下端から約 4px の
+         位置まで下げ、ホームバー（黒い横線）がカプセルの下部に重なる
+         くらい寄せる（LINE のタブバーのような置き方）。セーフエリアは
+         足さない。.app を fixed＋inset:0 でビューポートに固定してある
+         ので、この bottom は常に物理画面の下端基準になる。
+         カプセルの上端は 4＋54＝下から 58px。各画面の下余白ゾーンは
+         この上端に合わせて付け替えてあり、カプセル上端との間隔は
+         従来どおりに保たれるので中身は隠れない */
+      .tabbar { bottom: 4px; }
+
+      /* (4) バディ画面の右上カプセル：ステータスバーのすぐ下・画面の
+         右端に寄せて置く（LINE の右上ピルの感覚）。上は
+         safe-area-inset-top＋8px、右は 10px に詰める。カプセル自体の
+         寸法（160×44、アイコンボックス36px・間隔20px）は変えない */
+      .buddy-top { padding: calc(8px + env(safe-area-inset-top)) 10px 0; }
     </style>
   </head>
   <body>
